@@ -45,6 +45,7 @@ services:
       # - ${HOMER_CONFIG_PATH}:/www/assets/config.yml
       - ./homer-config.yml:/www/assets/config.yml
       - ./dashboard-icons:/www/assets-ext/
+      - ./mintyclouds-logo.png:/www/assets/mintyclouds-logo.png
     environment:
       - UID=1000
       - GID=1000
