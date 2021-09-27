@@ -18,7 +18,7 @@ services:
     hostname: ${HOSTNAME}
     container_name: "portainer"
     restart: unless-stopped
-    command: -H tcp://agent:9001 --tlsskipverify --no-auth
+    command: -H tcp://agent:9001 --tlsskipverify #--no-auth
     labels:
       traefik.enable: 'true'
       traefik.http.routers.portainer.entrypoints: 'websecure'
