@@ -3,7 +3,7 @@ services:
   # Portainer Agent
   agent:
     image: portainer/agent:${PORTAINER_AGENT_VERSION}
-    hostname: ${HOSTNAME}
+    # hostname: ${HOSTNAME}
     container_name: "agent"
     restart: unless-stopped
     volumes:
