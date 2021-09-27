@@ -1,48 +1,123 @@
 version: "3.7"
 services:
-  # Portainer
-#   agent:
-#     image: portainer/agent:${PORTAINER_AGENT_VERSION}
-#     hostname: ${HOSTNAME}
-#     restart: unless-stopped
-#     volumes:
-#       - /var/run/docker.sock:/var/run/docker.sock
-#       - /var/lib/docker/volumes:/var/lib/docker/volumes
-#     networks:
-#       - agent_network
+  # Portainer Agent
+  agent:
+    image: portainer/agent:${PORTAINER_AGENT_VERSION}
+    hostname: ${HOSTNAME}
+    container_name: "portainer_agent"
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - agent_network
 
-#   portainer:
-#     image: portainer/portainer-ce:${PORTAINER_VERSION}
-#     command: -H tcp://agent:9001 --tlsskipverify
-#     restart: always
-#     volumes:
-#       - ${PORTAINER_CONFIG_PATH}:/data
-#     networks:
-#       - agent_network
-#       - public
-#     ports:
-#       - ${PORTAINER_WEB_PORT}:9000
-#       - 8000:8000
-#  heimdall:
-#    image: linuxserver/heimdall:${HEIMDALL_VERSION}
-#    container_name: heimdall
-#    hostname: ${HOSTNAME}
-#    volumes:
-#      - ${HEIMDALL_CONFIG_PATH}:/config
-#    environment:
-#      - PUID=1000
-#      - PGID=1000
-#      - TZ=Europe/Moscow
-#    ports:
-#      - ${HEIMDALL_PORT}:443
-#      - 9001:80
-#    restart: unless-stopped
+  # Portainer
+  portainer:
+    image: portainer/portainer-ce:${PORTAINER_VERSION}
+    hostname: ${HOSTNAME}
+    container_name: "portainer"
+    restart: unless-stopped
+    command: -H tcp://agent:9001 --tlsskipverify --no-auth
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.portainer.entrypoints: 'websecure'
+      traefik.http.routers.portainer.middlewares: "authelia"
+      traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN?err}`)"
+
+      # traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN?err}`) && PathPrefix(`/portainer`)"
+      # traefik.http.routers.portainer.middlewares: "portainer-redirectregex, portainer-replacepathregex, authelia"
+      # traefik.http.middlewares.portainer-replacepathregex.replacepathregex.regex: "^/portainer/(.*)"
+      # traefik.http.middlewares.portainer-replacepathregex.replacepathregex.replacement: "/$$1"
+      # traefik.http.middlewares.portainer-redirectregex.redirectregex.regex: "^(.*)/portainer$$"
+      # traefik.http.middlewares.portainer-redirectregex.redirectregex.replacement: "$$1/portainer/"
+
+      traefik.http.routers.portainer.tls.certResolver: 'default'
+      traefik.http.services.portainer.loadbalancer.server.port: '9000'
+    volumes:
+      - ${PORTAINER_CONFIG_PATH}:/data
+    networks:
+      - agent_network
+      # - public
+
+  # Traefik
+  traefik:
+    image: traefik:${TRAEFIK_VERSION}
+    hostname: ${HOSTNAME}
+    container_name: "traefik"
+    restart: unless-stopped
+    command:
+      - "--log.level=DEBUG"
+
+      - --certificatesresolvers.default.acme.tlschallenge=true
+      - --certificatesresolvers.default.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesResolvers.default.acme.storage=/etc/traefik/acme/acme.json
+
+      - --accesslog=true
+      - --log.level=INFO
+      - --accesslog.fields.defaultmode=keep
+      - --accesslog.fields.headers.defaultmode=keep
+      - --metrics.prometheus=false
+      - --api.dashboard=true
+      - --entrypoints.websecure.address=:443
+
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      - --providers.file.directory=/external_configs
+      - --providers.file.watch=true
+      - --serversTransport.insecureSkipVerify=true    # Skip verification for services with default SSL
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.traefik.rule: "Host(`traefik.${DOMAIN?err}`)"
+      traefik.http.routers.traefik.service: 'api@internal'
+      traefik.http.routers.traefik.entrypoints: 'websecure'
+      traefik.http.routers.traefik.tls.certresolver: 'default'
+      traefik.http.routers.traefik.middlewares: authelia
+    volumes:
+      - "${TRAEFIK_CONFIG_PATH}/acme:/etc/traefik/acme"
+      - "${TRAEFIK_CONFIG_PATH}/conf:/external_configs"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+
+  # Authelia
+  authelia:
+    image: authelia/authelia:${AUTHELIA_VERSION}
+    hostname: ${HOSTNAME}
+    container_name: "authelia"
+    restart: unless-stopped
+    volumes:
+      - ${AUTHELIA_CONFIG_PATH}:/config
+    environment:
+      TZ: Europe/Moscow
+      AUTHELIA_JWT_SECRET: "${AUTHELIA_JWT_SECRET}"
+      AUTHELIA_SESSION_REDIS_PASSWORD: '${AUTHELIA_REDIS_PASSWORD}'
+      AUTHELIA_STORAGE_POSTGRES_PASSWORD: '${AUTHELIA_POSTGRES_PASSWORD}'
+      AUTHELIA_NOTIFIER_SMTP_PASSWORD: "${AUTHELIA_SMTP_PASSWORD}"
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.authelia.rule: 'Host(`authelia.${DOMAIN?err}`)'
+      traefik.http.routers.authelia.entrypoints: 'websecure'
+      traefik.http.routers.authelia.tls.certResolver: 'default'
+      traefik.http.middlewares.authelia.forwardauth.address: 'http://authelia:9091/api/verify?rd=https://authelia.mintyclouds.in'  # yamllint disable-line rule:line-length
+      traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: 'true'
+      traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: 'Remote-User,Remote-Groups,Remote-Name,Remote-Email'  # yamllint disable-line rule:line-length    
+
+  # Homer
   homer:
     image: b4bz/homer:${HOMER_VERSION}
-    container_name: homer
     hostname: ${HOSTNAME}
+    container_name: homer
+    restart: unless-stopped
     volumes:
-      # - ${HOMER_CONFIG_PATH}:/www/assets/config.yml
       - ./homer-config.yml:/www/assets/config.yml
       - ./dashboard-icons:/www/assets-ext/
       - ./mintyclouds-logo.png:/www/assets/mintyclouds-logo.png
@@ -50,11 +125,14 @@ services:
       - UID=1000
       - GID=1000
       - TZ=Europe/Moscow
-    ports:
-      - ${HOMER_PORT}:8080
-    restart: unless-stopped
-
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.authelia.rule: 'Host(`${DOMAIN?err}`)'
+      traefik.http.routers.authelia.entrypoints: 'websecure'
+      traefik.http.routers.authelia.tls.certResolver: 'default'
+      traefik.http.services.portainer.loadbalancer.server.port: '8080'
+    
   
-# networks:
-#   agent_network:
+networks:
+  agent_network:
 #   public:
