@@ -127,10 +127,10 @@ services:
       - TZ=Europe/Moscow
     labels:
       traefik.enable: 'true'
-      traefik.http.routers.authelia.rule: 'Host(`${DOMAIN?err}`)'
-      traefik.http.routers.authelia.entrypoints: 'websecure'
-      traefik.http.routers.authelia.tls.certResolver: 'default'
-      traefik.http.services.portainer.loadbalancer.server.port: '8080'
+      traefik.http.routers.homer.rule: 'Host(`${DOMAIN?err}`)'
+      traefik.http.routers.homer.entrypoints: 'websecure'
+      traefik.http.routers.homer.tls.certResolver: 'default'
+      traefik.http.services.homer.loadbalancer.server.port: '8080'
     
   
 networks:
