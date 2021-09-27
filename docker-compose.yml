@@ -4,7 +4,7 @@ services:
   agent:
     image: portainer/agent:${PORTAINER_AGENT_VERSION}
     hostname: ${HOSTNAME}
-    container_name: "portainer_agent"
+    container_name: "agent"
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
