@@ -131,6 +131,22 @@ services:
       traefik.http.routers.homer.entrypoints: 'websecure'
       traefik.http.routers.homer.tls.certResolver: 'default'
       traefik.http.services.homer.loadbalancer.server.port: '8080'
+
+  # Wiki.js
+  wiki:
+    image: requarks/wiki:${WIKIJS_VERSION}
+    hostname: ${HOSTNAME}
+    container_name: wikijs
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: ${WIKIJS_POSTGRES_HOST}
+      DB_PORT: ${WIKIJS_POSTGRES_PORT}
+      DB_USER: ${WIKIJS_POSTGRES_USER}
+      DB_PASS: ${WIKIJS_POSTGRES_PASSWORD}
+      DB_NAME: ${WIKIJS_POSTGRES_DB}
+    restart: unless-stopped
+    # ports:
+    #   - "80:3000"
     
   
 networks:
