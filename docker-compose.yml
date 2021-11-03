@@ -110,43 +110,6 @@ services:
       traefik.http.middlewares.authelia.forwardauth.address: 'http://authelia:9091/api/verify?rd=https://authelia.mintyclouds.in'  # yamllint disable-line rule:line-length
       traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: 'true'
       traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: 'Remote-User,Remote-Groups,Remote-Name,Remote-Email'  # yamllint disable-line rule:line-length    
-
-  # Homer
-  homer:
-    image: b4bz/homer:${HOMER_VERSION}
-    hostname: ${HOSTNAME}
-    container_name: homer
-    restart: unless-stopped
-    volumes:
-      - ./homer-config.yml:/www/assets/config.yml
-      - ./dashboard-icons:/www/assets-ext/
-      - ./mintyclouds-logo.png:/www/assets/mintyclouds-logo.png
-    environment:
-      - UID=1000
-      - GID=1000
-      - TZ=Europe/Moscow
-    labels:
-      traefik.enable: 'true'
-      traefik.http.routers.homer.rule: 'Host(`${DOMAIN?err}`)'
-      traefik.http.routers.homer.entrypoints: 'websecure'
-      traefik.http.routers.homer.tls.certResolver: 'default'
-      traefik.http.services.homer.loadbalancer.server.port: '8080'
-
-  # Wiki.js
-  wiki:
-    image: requarks/wiki:${WIKIJS_VERSION}
-    hostname: ${HOSTNAME}
-    container_name: wikijs
-    environment:
-      DB_TYPE: postgres
-      DB_HOST: ${WIKIJS_POSTGRES_HOST}
-      DB_PORT: ${WIKIJS_POSTGRES_PORT}
-      DB_USER: ${WIKIJS_POSTGRES_USER}
-      DB_PASS: ${WIKIJS_POSTGRES_PASSWORD}
-      DB_NAME: ${WIKIJS_POSTGRES_DB}
-    restart: unless-stopped
-    # ports:
-    #   - "80:3000"
     
   
 networks:
