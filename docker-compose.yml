@@ -1,44 +1,44 @@
 version: "3.7"
 services:
-  # Portainer Agent
-  agent:
-    image: portainer/agent:${PORTAINER_AGENT_VERSION}
-    # hostname: ${HOSTNAME}
-    container_name: "agent"
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/lib/docker/volumes:/var/lib/docker/volumes
-    networks:
-      - agent_network
+  # # Portainer Agent
+  # agent:
+  #   image: portainer/agent:${PORTAINER_AGENT_VERSION}
+  #   # hostname: ${HOSTNAME}
+  #   container_name: "agent"
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /var/lib/docker/volumes:/var/lib/docker/volumes
+  #   networks:
+  #     - agent_network
 
-  # Portainer
-  portainer:
-    image: portainer/portainer-ce:${PORTAINER_VERSION}
-    hostname: ${HOSTNAME}
-    container_name: "portainer"
-    restart: unless-stopped
-    command: -H tcp://agent:9001 --tlsskipverify #--no-auth
-    labels:
-      traefik.enable: 'true'
-      traefik.http.routers.portainer.entrypoints: 'websecure'
-      traefik.http.routers.portainer.middlewares: "authelia"
-      traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN?err}`)"
+  # # Portainer
+  # portainer:
+  #   image: portainer/portainer-ce:${PORTAINER_VERSION}
+  #   hostname: ${HOSTNAME}
+  #   container_name: "portainer"
+  #   restart: unless-stopped
+  #   command: -H tcp://agent:9001 --tlsskipverify #--no-auth
+  #   labels:
+  #     traefik.enable: 'true'
+  #     traefik.http.routers.portainer.entrypoints: 'websecure'
+  #     traefik.http.routers.portainer.middlewares: "authelia"
+  #     traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN?err}`)"
 
-      # traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN?err}`) && PathPrefix(`/portainer`)"
-      # traefik.http.routers.portainer.middlewares: "portainer-redirectregex, portainer-replacepathregex, authelia"
-      # traefik.http.middlewares.portainer-replacepathregex.replacepathregex.regex: "^/portainer/(.*)"
-      # traefik.http.middlewares.portainer-replacepathregex.replacepathregex.replacement: "/$$1"
-      # traefik.http.middlewares.portainer-redirectregex.redirectregex.regex: "^(.*)/portainer$$"
-      # traefik.http.middlewares.portainer-redirectregex.redirectregex.replacement: "$$1/portainer/"
+  #     # traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN?err}`) && PathPrefix(`/portainer`)"
+  #     # traefik.http.routers.portainer.middlewares: "portainer-redirectregex, portainer-replacepathregex, authelia"
+  #     # traefik.http.middlewares.portainer-replacepathregex.replacepathregex.regex: "^/portainer/(.*)"
+  #     # traefik.http.middlewares.portainer-replacepathregex.replacepathregex.replacement: "/$$1"
+  #     # traefik.http.middlewares.portainer-redirectregex.redirectregex.regex: "^(.*)/portainer$$"
+  #     # traefik.http.middlewares.portainer-redirectregex.redirectregex.replacement: "$$1/portainer/"
 
-      traefik.http.routers.portainer.tls.certResolver: 'default'
-      traefik.http.services.portainer.loadbalancer.server.port: '9000'
-    volumes:
-      - ${PORTAINER_CONFIG_PATH}:/data
-    networks:
-      - agent_network
-      # - public
+  #     traefik.http.routers.portainer.tls.certResolver: 'default'
+  #     traefik.http.services.portainer.loadbalancer.server.port: '9000'
+  #   volumes:
+  #     - ${PORTAINER_CONFIG_PATH}:/data
+  #   networks:
+  #     - agent_network
+  #     # - public
 
   # Traefik
   traefik:
