@@ -1,2 +1,3 @@
-docker_data
+.docker_data
 .env
+authelia-redis.conf
