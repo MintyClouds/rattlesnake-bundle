@@ -49,9 +49,12 @@ services:
     command:
       - "--log.level=DEBUG"
 
-      - --certificatesresolvers.default.acme.tlschallenge=true
+        #      - --certificatesresolvers.default.acme.tlschallenge=true
       - --certificatesresolvers.default.acme.email=${LETSENCRYPT_EMAIL}
       - --certificatesResolvers.default.acme.storage=/etc/traefik/acme/acme.json
+      - --certificatesResolvers.default.acme.dnsChallenge=true 
+      - --certificatesresolvers.default.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+      - --certificatesResolvers.default.acme.dnsChallenge.provider=cloudflare 
 
       - --accesslog=true
       - --log.level=INFO
@@ -60,6 +63,7 @@ services:
       - --metrics.prometheus=false
       - --api.dashboard=true
       - --entrypoints.websecure.address=:443
+      - --entrypoints.web.address=:80
 
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
@@ -73,11 +77,17 @@ services:
       traefik.http.routers.traefik.service: 'api@internal'
       traefik.http.routers.traefik.entrypoints: 'websecure'
       traefik.http.routers.traefik.tls.certresolver: 'default'
-      traefik.http.routers.traefik.middlewares: authelia
+      traefik.http.routers.traefik.middlewares: rattlesnake-authelia@file
+    networks:
+      - traefik_network
     volumes:
       - "${TRAEFIK_CONFIG_PATH}/acme:/etc/traefik/acme"
       - "${TRAEFIK_CONFIG_PATH}/conf:/external_configs"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_API_KEY=${CF_API_KEY}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     ports:
       - target: 80
         published: 80
@@ -100,6 +110,8 @@ services:
     volumes:
       - ./authelia-redis.conf:/usr/local/etc/redis/redis.conf
       - ${AUTHELIA_REDIS_DATA_PATH}:/data
+    networks:
+      - authelia_network
     # ports:
     #   - "${AUTHELIA_REDIS_PORT}:6379"
 
@@ -117,6 +129,8 @@ services:
     #   - "${AUTHELIA_POSTGRES_PORT}:5432"
     volumes:
       - ${AUTHELIA_POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+    networks:
+      - authelia_network
 
   # Authelia
   authelia:
@@ -132,19 +146,68 @@ services:
       AUTHELIA_SESSION_REDIS_PASSWORD: '${AUTHELIA_REDIS_PASSWORD}'
       AUTHELIA_STORAGE_POSTGRES_PASSWORD: '${AUTHELIA_POSTGRES_PASSWORD}'
       AUTHELIA_NOTIFIER_SMTP_PASSWORD: "${AUTHELIA_SMTP_PASSWORD}"
-    labels:
-      traefik.enable: 'true'
-      traefik.http.routers.authelia.rule: 'Host(`authelia.${DOMAIN?err}`)'
-      traefik.http.routers.authelia.entrypoints: 'websecure'
-      traefik.http.routers.authelia.tls.certResolver: 'default'
-      traefik.http.middlewares.authelia.forwardauth.address: 'http://authelia:9091/api/verify?rd=https://authelia.mintyclouds.in'  # yamllint disable-line rule:line-length
-      traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: 'true'
-      traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: 'Remote-User,Remote-Groups,Remote-Name,Remote-Email'  # yamllint disable-line rule:line-length    
+    networks:
+      - authelia_network
+      - traefik_network
+    ports:
+      - ${AUTHELIA_PORT}:9091
+#    labels:
+#      traefik.enable: 'true'
+#      traefik.http.routers.authelia.rule: 'Host(`authelia.${DOMAIN?err}`)'
+#      traefik.http.routers.authelia.entrypoints: 'websecure'
+#      traefik.http.routers.authelia.tls.certResolver: 'default'
+#      traefik.http.middlewares.authelia.forwardauth.address: 'http://authelia:9091/api/verify?rd=https://authelia.mintyclouds.in'  # yamllint disable-line rule:line-length
+#      traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: 'true'
+#      traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: 'Remote-User,Remote-Groups,Remote-Name,Remote-Email'  # yamllint disable-line rule:line-length    
     depends_on:
       - authelia-redis
       - authelia-postgresql
-    
+
+#  cloudflared:
+#    image: cloudflare/cloudflared:latest
+#    command: tunnel --no-autoupdate --protocol http2 run
+#    restart: unless-stopped
+#    container_name: "cloudlflared"
+#    environment:
+#      - TUNNEL_TOKEN=${CLOUDFLARED_TUNNEL_TOKEN}
+#    networks:
+#      traefik_network:
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    network_mode: "service:traefik"
+
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+    volumes:
+      - ${TAILSCALE_CONFIG_PATH}:/var/lib/tailscale
+
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_HOSTNAME: ${TAILSCALE_HOSTNAME}
+
+  homepage:
+      image: ghcr.io/gethomepage/homepage:latest
+      container_name: homepage
+      ports:
+        - ${GETHOMEPAGE_PORT}:3000
+      volumes:
+        - ${GETHOMEPAGE_CONFIG_PATH}:/app/config # Make sure your local config directory exists
+        - ${GETHOMEPAGE_IMAGES_PATH}:/app/public/images
+        - /var/run/docker.sock:/var/run/docker.sock:ro # (optional) For docker integrations
+      environment:
+        HOMEPAGE_ALLOWED_HOSTS: start.${DOMAIN?err}
+
   
 networks:
   agent_network:
+  traefik_network:
+  authelia_network:
 #   public:
